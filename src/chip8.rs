@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read};
 
-const FONT: [u32; 80]  = [
+const FONT: [u8; 80]  = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -20,21 +20,21 @@ const FONT: [u32; 80]  = [
 ];
 
 pub struct Chip8 {
-    ram : [u32; 4096],
-    v : [u8; 16], // registers
-    i : u16, // index register
-    pc : u32, // program counter
-    stack : [u16; 16],
-    sp : u8, // stack pointer
-    display : [u8; 64 * 32],
-    dt : u8, // delay timer
-    st : u8, // sound timer
-    keypad : Vec<u8>
+    pub ram : [u8; 4096],
+    pub v : [u8; 16], // registers
+    pub idx : u16, // index register
+    pub pc : usize, // program counter
+    pub stack : [u16; 16],
+    pub sp : u8, // stack pointer
+    pub display : [u8; 64 * 32],
+    pub dt : u8, // delay timer
+    pub st : u8, // sound timer
+    pub keypad : [bool; 16]
 }
 
 impl Chip8 {
     pub fn new (rom : Vec<u8>) -> Self {
-        let mut rm: [u32; 4096] = [0; 4096];
+        let mut rm: [u8; 4096] = [0; 4096];
         
         // load font
         for i in 0..FONT.len() {
@@ -43,21 +43,21 @@ impl Chip8 {
 
         // load rom
         for i in 0..rom.len() {
-            rm[0x200 + i] = rom[i] as u32;
+            rm[0x200 + i] = rom[i];
         }
 
 
         return Self {
             ram : rm,
             v : [0; 16],
-            i : 0,
+            idx : 0,
             pc : 0x200,
             stack : [0; 16],
             sp : 0,
             display : [0; 64 * 32],
             dt : 0,
             st : 0,
-            keypad : vec![0; 16]
+            keypad : [false; 16]
         }
     }
 
@@ -75,4 +75,39 @@ impl Chip8 {
 
         return buffer;
     }
+
+    pub fn start(&mut self) -> (){
+        self.cycle();
+    }
+
+    fn cycle(&mut self) -> () {
+        let mut i: i32 = 1000;
+        while i > 0  {
+            
+            let mut opcode: u16 = self.fetch();
+            let instruction:u16 = Self::decode(opcode);
+
+            self.execute(instruction, opcode);
+            
+            i -= 1;
+        }
+    }
+
+    fn execute(&mut self, instruction: u16, opcode: u16) {
+        match instruction {
+            0 => {
+                match opcode {
+                    0x00E0 => self.clear_screen(),
+                    _ => print!("Unknown opcode : {:#06X}", opcode)
+                }
+            },
+            1 => self.jump(opcode),
+            6 => self.set_register(opcode),
+            7 => self.add_to_register( opcode),
+            0xA => self.set_index(opcode),
+            0xD => self.draw(opcode),
+            _ => println!("Unknown opcode : {:#06X}", opcode)
+        }
+    }
+
 }
