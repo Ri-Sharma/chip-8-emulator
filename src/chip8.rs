@@ -98,15 +98,49 @@ impl Chip8 {
             0 => {
                 match opcode {
                     0x00E0 => self.clear_screen(),
-                    _ => print!("Unknown opcode : {:#06X}", opcode)
+                    0x00EE => self.return_from_subroutine(),
+                    _ => print!("Unknown opcode : {:#04X}", opcode)
                 }
             },
-            1 => self.jump(opcode),
-            6 => self.set_register(opcode),
-            7 => self.add_to_register( opcode),
+            0x1 => self.jump(opcode),
+            0x2 => self.call_subroutine(opcode),
+            0x3 => self.skip_if_eq(opcode),
+            0x4 => self.skip_if_neq(opcode),
+            0x5 => self.skip_if_x_eq_y(opcode),
+            0x6 => self.set_register(opcode),
+            0x7 => self.add_to_register( opcode),
+            0x8 => {
+                match opcode & 0xF {
+                    0x0 => self.set(opcode),
+                    0x1 => self.binary_or(opcode),
+                    0x2 => self.binary_and(opcode),
+                    0x3 => self.logical_xor(opcode),
+                    0x4 => self.add(opcode),
+                    0x5 => self.subtract(opcode),
+                    0x6 => self.shift_right(opcode),
+                    0x7 => self.subtract_from(opcode),
+                    0xE => self.shift_left(opcode),
+                    _ => print!("Unknown opcode : {:#04X}", opcode)
+                }
+            }
+            0x9 => self.skip_if_x_neq_y(opcode),
             0xA => self.set_index(opcode),
             0xD => self.draw(opcode),
-            _ => println!("Unknown opcode : {:#06X}", opcode)
+            0xF => {
+                match opcode & 0xFF {
+                    0x07 => self.set_from_delay_timer(opcode),
+                    0x15 => self.set_delay_timer(opcode),
+                    0x18 => self.set_sound_timer(opcode),
+                    0x1E => self.add_to_index(opcode),
+                    0x0A => self.get_key(opcode),
+                    0x29 => self.font_character(opcode),
+                    0x33 => self.binary_coded_decimal_conversion(opcode),
+                    0x55 => self.store_memory(opcode),
+                    0x65 => self.load_memory(opcode),
+                     _ => print!("Unknown opcode : {:#04X}", opcode)
+                }
+            }
+            _ => println!("Unknown opcode : {:#04X}", opcode)
         }
     }
 
