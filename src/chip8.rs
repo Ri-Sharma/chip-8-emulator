@@ -19,6 +19,9 @@ const FONT: [u8; 80]  = [
     0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 ];
 
+const WIDTH: usize = 64;
+const HEIGHT: usize = 32;
+
 pub struct Chip8 {
     pub ram : [u8; 4096],
     pub v : [u8; 16], // registers
@@ -26,7 +29,7 @@ pub struct Chip8 {
     pub pc : usize, // program counter
     pub stack : [u16; 16],
     pub sp : u8, // stack pointer
-    pub display : [u8; 64 * 32],
+    pub display : [u8; WIDTH * HEIGHT],
     pub dt : u8, // delay timer
     pub st : u8, // sound timer
     pub keypad : [bool; 16]
@@ -46,7 +49,6 @@ impl Chip8 {
             rm[0x200 + i] = rom[i];
         }
 
-
         return Self {
             ram : rm,
             v : [0; 16],
@@ -54,7 +56,7 @@ impl Chip8 {
             pc : 0x200,
             stack : [0; 16],
             sp : 0,
-            display : [0; 64 * 32],
+            display : [0; WIDTH * HEIGHT],
             dt : 0,
             st : 0,
             keypad : [false; 16]
@@ -76,21 +78,12 @@ impl Chip8 {
         return buffer;
     }
 
-    pub fn start(&mut self) -> (){
-        self.cycle();
-    }
+    pub fn tick(&mut self) -> () { // Here a tick shows a complete fetch-decode-execute cycle.
+         // fetch -- execute -- decode
+        let opcode = self.fetch();
+        let instruction = Self::decode(opcode);
+        self.execute(instruction, opcode);
 
-    fn cycle(&mut self) -> () {
-        let mut i: i32 = 1000;
-        while i > 0  {
-            
-            let mut opcode: u16 = self.fetch();
-            let instruction:u16 = Self::decode(opcode);
-
-            self.execute(instruction, opcode);
-            
-            i -= 1;
-        }
     }
 
     fn execute(&mut self, instruction: u16, opcode: u16) {
@@ -126,6 +119,13 @@ impl Chip8 {
             0x9 => self.skip_if_x_neq_y(opcode),
             0xA => self.set_index(opcode),
             0xD => self.draw(opcode),
+            0xE => {
+                match opcode & 0xFF {
+                    0x9E => self.skip_if_pressed(opcode),
+                    0xA1 => self.skip_if_not_pressed(opcode),
+                    _ => print!("Unknown opcode : {:#04X}", opcode)
+                }
+            }
             0xF => {
                 match opcode & 0xFF {
                     0x07 => self.set_from_delay_timer(opcode),
@@ -143,5 +143,4 @@ impl Chip8 {
             _ => println!("Unknown opcode : {:#04X}", opcode)
         }
     }
-
 }
