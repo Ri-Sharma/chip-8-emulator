@@ -38,7 +38,7 @@ impl Chip8 {
         // 7XNN
         let reg = (opcode >> 8) & 0xF;
         let val = (opcode & 0xFF) as u8;
-        self.v[reg as usize] += val;
+        self.v[reg as usize] = self.v[reg as usize].wrapping_add(val);
     }
 
     pub fn set_index(&mut self, opcode:u16) -> () {
@@ -91,8 +91,8 @@ impl Chip8 {
 
     pub fn return_from_subroutine(&mut self) {
         // 00EE
-        self.pc = self.stack[self.sp as usize] as usize;
         self.sp = self.sp - 1;
+        self.pc = self.stack[self.sp as usize] as usize;
     }
 
     pub fn skip_if_eq(&mut self, opcode:u16){
@@ -100,7 +100,7 @@ impl Chip8 {
         let x = (opcode >> 8) & 0xF;
         let nn = opcode & 0xFF;
 
-        if(self.v[x as usize] == nn as u8) {
+        if self.v[x as usize] == nn as u8 {
             self.pc = self.pc + 2;
         }
     }
@@ -163,7 +163,7 @@ impl Chip8 {
 
     pub fn logical_xor(&mut self, opcode: u16) {
         // 8XY3
-        let x: usize = (opcode as usize >> 8) & 0xF;
+        let x = (opcode as usize >> 8) & 0xF;
         let y = (opcode as usize >> 4) & 0xF;
 
         self.v[x] ^= self.v[y];
@@ -172,20 +172,22 @@ impl Chip8 {
 
     pub fn add(&mut self, opcode: u16) {
         // 8XY4
-        let x: usize = (opcode as usize >> 8) & 0xF;
+        let x = (opcode as usize >> 8) & 0xF;
         let y = (opcode as usize >> 4) & 0xF;
 
         let val_x = self.v[x] as u16;
         let val_y = self.v[y] as u16;
 
+        let flag;
         if val_x + val_y > 0xFF {
-            self.v[0xF] = 1;
+            flag = 1;
         }
         else {
-            self.v[0xF] = 0;
+            flag = 0;
         }
 
-        self.v[x] += self.v[y];
+        self.v[x] = self.v[x].wrapping_add(self.v[y]);
+        self.v[0xF] = flag;
         
     }
 
@@ -194,7 +196,14 @@ impl Chip8 {
         let x  = (opcode as usize >> 8) & 0xF;
         let y = (opcode as usize >> 4) & 0xF;
 
-        self.v[x] = self.v[x] - self.v[y];
+        let flag;
+        if self.v[x] >= self.v[y] {
+            flag = 1;
+        } else {
+            flag = 0;
+        }
+        self.v[x] = self.v[x].wrapping_sub(self.v[y]);
+        self.v[0xF] = flag;
     }
 
     pub fn subtract_from(&mut self, opcode: u16) {
@@ -202,7 +211,14 @@ impl Chip8 {
         let x = (opcode as usize >> 8) & 0xF;
         let y = (opcode as usize >> 4) & 0xF;
 
-        self.v[x] = self.v[y] - self.v[x];
+        let flag;
+        if self.v[y] >= self.v[x] {
+            flag = 1;
+        } else {
+            flag = 0;
+        }
+        self.v[x] = self.v[y].wrapping_sub(self.v[x]);
+        self.v[0xF] = flag;
     }
 
     pub fn shift_right(&mut self, opcode: u16) {
@@ -211,10 +227,10 @@ impl Chip8 {
         let y = (opcode as usize >> 4) & 0xF;
 
         self.v[x] = self.v[y];
-
-        self.v[0xF] = self.v[x] & 1;
+        let flag = self.v[x] & 1;
 
         self.v[x] >>= 1;
+        self.v[0xF] = flag;
     }
 
     pub fn shift_left(&mut self, opcode: u16) {
@@ -223,10 +239,28 @@ impl Chip8 {
         let y = (opcode as usize >> 4) & 0xF;
 
         self.v[x] = self.v[y];
-
-        self.v[0xF] = (self.v[x] >> 7) & 1;
+        let flag = (self.v[x] >> 7) & 1;
 
         self.v[x] <<= 1;
+        self.v[0xF] = flag;
+    }
+
+    pub fn skip_if_pressed(&mut self, opcode: u16) {
+        // EX0E
+        let x = (opcode as usize >> 8) & 0xF;
+
+        if self.keypad[self.v[x] as usize] {
+            self.pc = self.pc + 2;
+        }
+    }
+
+    pub fn skip_if_not_pressed(&mut self, opcode:u16) {
+        // EXA1 
+        let x = (opcode as usize >> 8) & 0xF;
+
+        if !self.keypad[self.v[x] as usize] {
+            self.pc = self.pc + 2;
+        }
     }
 
     pub fn set_from_delay_timer(&mut self, opcode: u16) {
@@ -254,7 +288,7 @@ impl Chip8 {
         // FX1E
         let x = (opcode as usize >> 8) & 0xF;
 
-        if self.idx + self.v[x] as u16 > 0xFFFF { // <<! how to signify overflow with only 16 bits variable type?
+        if self.idx + self.v[x] as u16 > 0x0FFF {
             self.v[0xF] = 1;
         }
 
@@ -264,15 +298,27 @@ impl Chip8 {
     pub fn get_key(&mut self, opcode: u16) {
         // FX0A
         let x = (opcode as usize >> 8) & 0xF;
-
+        
         // Keyboard input
+        let mut flag:bool = false;
+        for i in 0..self.keypad.len() {
+            if self.keypad[i] {
+                self.v[x] = i as u8;
+                flag = true;
+                break;
+            }
+        }
+
+        if !flag {
+            self.pc = self.pc - 2;
+        }
     }
 
     pub fn font_character(&mut self, opcode: u16) {
         // FX29
         let x = (opcode as usize >> 8) & 0xF;
 
-        self.idx = 0x50 + (5 * self.v[x] as u16) // << confirm this.
+        self.idx = 0x50 + (5 * self.v[x] as u16) 
     }
 
     pub fn binary_coded_decimal_conversion(&mut self, opcode: u16) {
@@ -280,17 +326,12 @@ impl Chip8 {
         let x = (opcode as usize >> 8) & 0xF;
         let mut x_val = self.v[x];
 
-        let mut i:u8 = 2;
-
-        while i >= 0 {
+        for i in 0..=2 {
             let dig = x_val % 10;
-            self.ram[self.idx as usize + i as usize] = dig;
+            self.ram[self.idx as usize + (2 - i) as usize] = dig;
 
             x_val /= 10;
-            i -= 1;
         }
-
-        // << confirm this as-well
     }
 
     pub fn store_memory(&mut self, opcode: u16) {
