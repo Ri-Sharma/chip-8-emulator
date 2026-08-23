@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read};
+use std::{fs::{self}, io::Error};
 
 const FONT: [u8; 80]  = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -64,18 +64,14 @@ impl Chip8 {
     }
 
     pub fn load_from_rom(path : &str) -> Self {
-        let rom = Self::load_rom(path);
-        return Self::new(rom);
+        match Self::load_rom(path) {
+            Ok(rom)  => Self::new(rom),
+            Err(e) => panic!("Not able to read the file: {}. \n{}", path, e),
+        }
     }
 
-
-    pub fn load_rom (path : &str) -> Vec<u8> {
-        let mut file = File::open(path).expect("Not able to read the file.");
-
-        let mut buffer: Vec<u8> = Vec::new();
-        file.read_to_end(&mut buffer).expect("Something went wrong while reading the file.");
-
-        return buffer;
+    fn load_rom (path : &str) -> Result<Vec<u8>, Error> {
+        fs::read(path)
     }
 
     pub fn tick(&mut self) -> () { // Here a tick shows a complete fetch-decode-execute cycle.
@@ -92,7 +88,7 @@ impl Chip8 {
                 match opcode {
                     0x00E0 => self.clear_screen(),
                     0x00EE => self.return_from_subroutine(),
-                    _ => print!("Unknown opcode : {:#04X}", opcode)
+                    _ => eprintln!("Unknown opcode : {:#04X}", opcode)
                 }
             },
             0x1 => self.jump(opcode),
@@ -113,7 +109,7 @@ impl Chip8 {
                     0x6 => self.shift_right(opcode),
                     0x7 => self.subtract_from(opcode),
                     0xE => self.shift_left(opcode),
-                    _ => print!("Unknown opcode : {:#04X}", opcode)
+                    _ => eprintln!("Unknown opcode : {:#04X}", opcode)
                 }
             }
             0x9 => self.skip_if_x_neq_y(opcode),
@@ -123,7 +119,7 @@ impl Chip8 {
                 match opcode & 0xFF {
                     0x9E => self.skip_if_pressed(opcode),
                     0xA1 => self.skip_if_not_pressed(opcode),
-                    _ => print!("Unknown opcode : {:#04X}", opcode)
+                    _ => eprintln!("Unknown opcode : {:#04X}", opcode)
                 }
             }
             0xF => {
@@ -137,10 +133,10 @@ impl Chip8 {
                     0x33 => self.binary_coded_decimal_conversion(opcode),
                     0x55 => self.store_memory(opcode),
                     0x65 => self.load_memory(opcode),
-                     _ => print!("Unknown opcode : {:#04X}", opcode)
+                     _ => eprintln!("Unknown opcode : {:#04X}", opcode)
                 }
             }
-            _ => println!("Unknown opcode : {:#04X}", opcode)
+            _ => eprintln!("Unknown opcode : {:#04X}", opcode)
         }
     }
 }
