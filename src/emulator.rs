@@ -1,10 +1,13 @@
 use minifb::{Key::{self}, Scale, ScaleMode, Window, WindowOptions};
+use rodio::{DeviceSinkBuilder, MixerDeviceSink, Player, source::SineWave};
 
 use crate::chip8::Chip8;
 
 pub struct Emulator {
     cpu : Chip8,
-    window : Window
+    window : Window,
+    player: Player,
+    _audio_stream: MixerDeviceSink
 }
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
@@ -34,16 +37,22 @@ impl Emulator {
         // Limit to max ~60 fps update rate
         window.set_target_fps(60);
 
+        let stream = DeviceSinkBuilder::open_default_sink().expect("open default audio stream");
+        let player = Player::connect_new(&stream.mixer());
+        player.append(SineWave::new(440.0));
+
         return Self {
             cpu : cpu,
-            window : window
+            window : window,
+            player : player,
+            _audio_stream : stream
         }
     }
 
     /*
-    Display have a 60hz refresh rate.
-    For each frame we'll execute 10 cpu-cycles, 600 cycles per seconds.
-    For each frame decrement sound and delay timer (60 times per seconds)
+    The emulator runs at 60 frames per second (matching the original display refresh rate).
+    Each frame: execute 10 CPU instructions (~600 instructions/second), then decrement timers.
+    Timers (delay and sound) tick down at 60Hz — once per frame.
      */
     pub fn run(&mut self) {
         let window = &mut self.window;
@@ -61,6 +70,15 @@ impl Emulator {
             Self::update_buffer(&mut buffer, self.cpu.display);
             window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
 
+
+            // Play sound
+            if self.cpu.st > 0 {
+                self.player.play();
+            }
+            else {
+                self.player.pause();
+            }
+
             // Decrement timers
             if self.cpu.dt > 0 {
                 self.cpu.dt = self.cpu.dt - 1;
@@ -68,6 +86,8 @@ impl Emulator {
             if self.cpu.st > 0 {
                 self.cpu.st = self.cpu.st -1;
             }
+
+            
         }
     }
 
@@ -96,7 +116,7 @@ impl Emulator {
                     Key::D    => keyboard[0xD] = true,
                     Key::E    => keyboard[0xE] = true,
                     Key::F    => keyboard[0xF] = true,
-                    Key::Escape => panic!("Exit!!!"),
+                    Key::Escape =>  std::process::exit(0),
                     _ => (),
                 }
             }
