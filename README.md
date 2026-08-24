@@ -76,7 +76,7 @@ src/
 
 ## References & Acknowledgements
 
-- [Guide to making a CHIP-8 emulator](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/) by Tobias V. Langhoff — technical reference
+- [Guide to making a CHIP-8 emulator](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/) by Tobias V. I. Langhoff — technical reference
 - [CHIP-8 Test Suite](https://github.com/Timendus/chip8-test-suite) by Timendus — opcode test ROMs
 - [chip8-test-rom](https://github.com/corax89/chip8-test-rom) by corax89 — Corax+ opcode test ROM
 - [CHIP-8 ROM's](https://github.com/badlogic/chip8/tree/master/roms) by badlogic — ROM pool
